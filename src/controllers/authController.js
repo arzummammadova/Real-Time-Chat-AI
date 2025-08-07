@@ -1,8 +1,10 @@
-import { registerValidation } from "../validation/authValidation.js";
+import { loginValidation, registerValidation } from "../validation/authValidation.js";
 import User from "../models/authModel.js";
 import bcrypt from "bcrypt";
 import { transporter } from "../utils/mailer.js";
 import crypto from "crypto";
+import jwt from "jsonwebtoken";
+
 export const register = async (req, res) => {
   try {
     const { error } = registerValidation.validate(req.body);
@@ -78,6 +80,56 @@ export const verifyEmail = async (req, res) => {
 };
 
 
-export const login=(res,req)=>({
+export const login = async (req, res) => {
+  try {
+    const { error } = loginValidation.validate(req.body);
+    if (error) {
+      return res.status(400).json({ message: error.details[0].message });
+    }
 
-})
+    const { username, email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email və şifrə tələb olunur" });
+    }
+
+    // İstifadəçini tap
+    const user = await User.findOne({ $or: [{ email }, { username }] });
+    if (!user) {
+      return res.status(400).json({ message: "İstifadəçi tapılmadı" });
+    }
+
+    // Şifrəni yoxla
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(400).json({ message: "Şifrə yanlışdır" });
+    }
+
+    // Email təsdiqlənibmi?
+    if (!user.emailVerified) {
+      return res.status(400).json({ message: "Zəhmət olmasa emailinizi təsdiqləyin" });
+    }
+
+    // 🔑 JWT Token yarat
+    const token = jwt.sign(
+      { id: user._id, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    // 🔐 Token-i response-a əlavə et
+    return res.status(200).json({
+      message: "Login successful",
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+      },
+    });
+
+  } catch (error) {
+    return res.status(500).json({ message: "Server xətası", error: error.message });
+  }
+};
