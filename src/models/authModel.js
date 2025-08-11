@@ -9,12 +9,13 @@ const UserSchema=new mongoose.Schema({
         type:String,
         required:true,
         unique:true,
-
     },
     password:{
         type:String,
-        required:true,
-
+        // Yalnız Google ilə qeydiyyatdan keçməyən istifadəçilər üçün şifrə tələb olunur
+        required: function() {
+            return !this.googleId;
+        },
     },
     role:{
         type:String,
@@ -22,18 +23,22 @@ const UserSchema=new mongoose.Schema({
         default:"user",
     },
     emailVerified: {
-  type: Boolean,
-  default: false,
-},
-
+        type: Boolean,
+        default: false,
+    },
     emailToken:{
         type:String,
     },
     emailTokenExpires:{
         type:Date,
+    },
+    // Google ilə daxil olan istifadəçiləri fərqləndirmək üçün yeni sahə
+    googleId: {
+        type: String,
+        unique: true,
+        sparse: true,
     }
     
 },{timestamps:true})
-
 
 export default mongoose.model("User",UserSchema)
